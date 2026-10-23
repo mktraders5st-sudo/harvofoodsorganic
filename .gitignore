@@ -57,3 +57,6 @@ coverage/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Database backups (contain customer details)
+backups/

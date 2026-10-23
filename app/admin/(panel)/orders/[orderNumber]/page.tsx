@@ -48,7 +48,8 @@ export default async function AdminOrderPage({ params }: Props) {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <section className="rounded-xl border border-cream-200 bg-white">
+        {/* min-w-0 lets the items table scroll inside this box on phones instead of widening the page */}
+        <section className="min-w-0 rounded-xl border border-cream-200 bg-white">
           <h2 className="border-b border-cream-200 px-5 py-3 text-lg font-bold">Items</h2>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-sm">

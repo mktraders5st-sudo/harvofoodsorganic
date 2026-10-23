@@ -121,6 +121,19 @@ export const contactInfo = {
   social: "@harvoororganicfoods",
 };
 
+/**
+ * Social media profile links shown in the footer. Paste the full address of each profile
+ * (e.g. "https://www.instagram.com/yourpage"). Empty ones are hidden.
+ * None are set yet: the @harvoororganicfoods handle on the poster doesn't match a live
+ * Instagram, Facebook, TikTok or Threads account (checked Oct 2026).
+ */
+export const socialLinks = {
+  instagram: "",
+  facebook: "",
+  tiktok: "",
+  threads: "",
+};
+
 export { DELIVERY_FEE, FREE_DELIVERY_MIN } from "./pricing";
 
 /** Show at or below this many packs as "Only N left". */

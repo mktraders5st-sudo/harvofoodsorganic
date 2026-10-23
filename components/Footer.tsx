@@ -1,18 +1,16 @@
 import Link from "next/link";
-import { categories, contactInfo } from "@/lib/data";
+import { categories, contactInfo, socialLinks } from "@/lib/data";
 import { MailIcon, PhoneIcon, PinIcon, WhatsAppIcon } from "./icons";
 import { Logo } from "./Logo";
 import { Container } from "./ui";
 
-const handle = contactInfo.social.replace("@", "");
-
-// Built from the handle on the Harvo poster. Check each link opens the right page.
+// Only profiles with a link set in lib/data.ts are shown.
 const socials = [
-  { label: "Instagram", short: "Ig", href: `https://www.instagram.com/${handle}` },
-  { label: "Facebook", short: "Fb", href: `https://www.facebook.com/${handle}` },
-  { label: "TikTok", short: "Tk", href: `https://www.tiktok.com/@${handle}` },
-  { label: "Threads", short: "Th", href: `https://www.threads.net/@${handle}` },
-];
+  { label: "Instagram", short: "Ig", href: socialLinks.instagram },
+  { label: "Facebook", short: "Fb", href: socialLinks.facebook },
+  { label: "TikTok", short: "Tk", href: socialLinks.tiktok },
+  { label: "Threads", short: "Th", href: socialLinks.threads },
+].filter((s) => s.href);
 
 const quickLinks = [
   { href: "/shop", label: "Shop All" },
@@ -43,21 +41,22 @@ export function Footer() {
             <p className="mt-4 max-w-xs">
               Pure goodness of nature. 100% natural powders, dried fruit slices and masalas with no preservatives.
             </p>
-            <div className="mt-5 flex gap-2">
-              {socials.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={s.label}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-white/15 text-xs font-semibold hover:border-tomato-500 hover:bg-tomato-600 hover:text-white"
-                >
-                  {s.short}
-                </a>
-              ))}
-            </div>
-            <p className="mt-3 text-xs">{contactInfo.social}</p>
+            {socials.length > 0 && (
+              <div className="mt-5 flex gap-2">
+                {socials.map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={s.label}
+                    className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-xs font-semibold hover:border-tomato-500 hover:bg-tomato-600 hover:text-white"
+                  >
+                    {s.short}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

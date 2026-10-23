@@ -2,18 +2,39 @@
 
 Next.js (App Router) + Tailwind CSS v4 + TypeScript + SQLite.
 
-## Run it
+## Run it on your computer
 
-```bash
-npm install
-npm run admin:create -- yourname   # first time only: create your admin login
-npm run dev
-```
+**Needs:** Node.js 22 or newer (tested with 24.22.1). Check with `node --version`.
 
-- Shop: http://localhost:3000
-- Admin: http://localhost:3000/admin
+1. Open a terminal **in this folder** (`harvo-web`). On Windows: open the folder in File Explorer, click the address bar, type `powershell` and press Enter.
+2. First time only, install packages and create your admin login (the password is typed hidden, 12+ characters):
+   ```bash
+   npm install
+   npm run admin:create -- yourname
+   ```
+3. Start the site:
+   ```bash
+   npm run dev
+   ```
+4. Open http://localhost:3000 for the shop and http://localhost:3000/admin for the admin panel. Press `Ctrl + C` in the terminal to stop.
 
-The database (`data/harvo.db`) is created automatically and filled with the starting product list the first time the site runs.
+The database (`data/harvo.db`) is created automatically the first time the site runs, filled with the starting product list (stock: 50 packs per size).
+
+> If `node` or `npm` is "not recognized", close and reopen the terminal (Node was added to your PATH after it was opened).
+
+### All commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Run for development (reloads when you edit files) |
+| `npm run build` then `npm start` | Run the fast production version |
+| `npm run admin:create -- name` | Create an admin, or reset an admin's password |
+| `npm run orders` | List the latest orders in the terminal |
+| `npm run backup` | Save a safe copy of the database to `backups/` |
+
+## Put it online
+
+See **[DEPLOY.md](DEPLOY.md)** for step-by-step instructions (Ubuntu VPS, PM2, Nginx, free HTTPS, daily backups, updates).
 
 ## Admin panel (`/admin`)
 
@@ -66,11 +87,12 @@ Creates the account, or sets a new password if it already exists (this also sign
 
 ## Hosting
 
-SQLite needs a server with a persistent disk (a VPS or a Node host). On serverless hosts such as Vercel, move to a hosted database (e.g. Postgres or Turso). Back up `data/harvo.db` regularly: it holds all orders and products. Always serve the site over HTTPS.
+Needs a server with a persistent disk (a VPS), not serverless hosting like Vercel. Full steps in [DEPLOY.md](DEPLOY.md). Back up the database daily (`npm run backup`): it holds all orders and products.
 
 ## Still to do
 
 - Add real product photos.
 - Set real prices and stock in the admin panel.
 - Connect the contact form and newsletter to real services.
-- Confirm the email address and social links (built from `@harvoororganicfoods`).
+- Confirm the email address (`harvoororganicfoods@gmail.com`, copied from the poster).
+- Add your real social media profile links in `lib/data.ts` (`socialLinks`). They are hidden until set; the `@harvoororganicfoods` handle did not match live accounts.

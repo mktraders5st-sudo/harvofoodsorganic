@@ -26,7 +26,7 @@ export function OrdersTable({ orders, empty = "No orders yet." }: { orders: Orde
           {orders.map((o) => (
             <tr key={o.orderNumber} className="hover:bg-forest-50/60">
               <td className="px-4 py-3">
-                <Link href={`/admin/orders/${o.orderNumber}`} className="font-mono font-semibold text-forest-700 hover:underline">
+                <Link href={`/admin/orders/${o.orderNumber}`} className="whitespace-nowrap font-mono font-semibold text-forest-700 hover:underline">
                   {o.orderNumber}
                 </Link>
               </td>
