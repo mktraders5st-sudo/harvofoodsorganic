@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "orders": "node scripts/list-orders.mjs",
-    "admin:create": "node scripts/create-admin.mjs",
     "backup": "node scripts/backup-db.mjs"
   },
   "dependencies": {

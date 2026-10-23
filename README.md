@@ -7,28 +7,28 @@ Next.js (App Router) + Tailwind CSS v4 + TypeScript + SQLite.
 **Needs:** Node.js 22 or newer (tested with 24.22.1). Check with `node --version`.
 
 1. Open a terminal **in this folder** (`harvo-web`). On Windows: open the folder in File Explorer, click the address bar, type `powershell` and press Enter.
-2. First time only, install packages and create your admin login (the password is typed hidden, 12+ characters):
+2. First time only, install packages:
    ```bash
    npm install
-   npm run admin:create -- yourname
    ```
 3. Start the site:
    ```bash
    npm run dev
    ```
-4. Open http://localhost:3000 for the shop and http://localhost:3000/admin for the admin panel. Press `Ctrl + C` in the terminal to stop.
+4. Open http://localhost:3000 for the shop and **http://localhost:3000/admin** for the admin panel: **no login is needed on your own computer**. Press `Ctrl + C` in the terminal to stop.
 
 The database (`data/harvo.db`) is created automatically the first time the site runs, filled with the starting product list (stock: 50 packs per size).
 
-> If `node` or `npm` is "not recognized", close and reopen the terminal (Node was added to your PATH after it was opened).
+> **Windows PowerShell says "running scripts is disabled"?** Type `npm.cmd` instead of `npm` (e.g. `npm.cmd run dev`), or use Command Prompt. It's the same npm.
+>
+> **`node` or `npm` "not recognized"?** Close and reopen the terminal (Node was added to your PATH after it was opened).
 
 ### All commands
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Run for development (reloads when you edit files) |
-| `npm run build` then `npm start` | Run the fast production version |
-| `npm run admin:create -- name` | Create an admin, or reset an admin's password |
+| `npm run dev` | Run for development on this computer only (reloads when you edit files; admin needs no login) |
+| `npm run build` then `npm start` | Run the fast production version (admin needs `ADMIN_PASSWORD`, see below) |
 | `npm run orders` | List the latest orders in the terminal |
 | `npm run backup` | Save a safe copy of the database to `backups/` |
 
@@ -48,20 +48,22 @@ See **[DEPLOY.md](DEPLOY.md)** for step-by-step instructions (Ubuntu VPS, PM2, N
 
 Stock goes down automatically when an order is placed and goes back up if the order is cancelled. Customers can't order more than is in stock.
 
-### Admin accounts
+### Admin access
 
-```bash
-npm run admin:create -- yourname
-```
+| Where | How you get in |
+| --- | --- |
+| **Your computer** (`npm run dev`, opened as `localhost`) | No login. A yellow "Local mode · no login" badge shows in the admin bar. |
+| **The live website** | One admin password, set with the `ADMIN_PASSWORD` environment variable (12+ characters) in your hosting settings or the server's `.env.local`. |
+| **Live website without `ADMIN_PASSWORD`** | Admin stays locked for everyone; the login page says it isn't set up. |
 
-Creates the account, or sets a new password if it already exists (this also signs that account out everywhere). Passwords must be at least 12 characters and are typed hidden.
+To change the live password, change `ADMIN_PASSWORD` and restart the site; everyone signed in is signed out.
 
 ### Security
 
-- Passwords are hashed with scrypt (random salt); plain passwords are never stored.
-- Sessions: random 256-bit token in an httpOnly, SameSite=Strict cookie (Secure in production); only its SHA-256 hash is stored. Sessions expire after 8 hours.
-- **Every admin page and every admin action checks the session on the server** (`requireAdmin()` in `lib/server/auth.ts`).
-- 5 wrong passwords lock the account for 15 minutes; sign-in attempts are also rate-limited per connection.
+- Password-free access only works when **all** of these are true: development mode (`npm run dev`), the site is opened as `localhost` / `127.0.0.1`, and the dev server only listens to this computer (`-H 127.0.0.1` in the `dev` script), so other devices on your Wi-Fi can't reach it. A deployed site runs in production mode, where this can never switch on.
+- **Every admin page and every admin action checks access on the server** (`requireAdmin()` in `lib/server/auth.ts`).
+- Live sign-in: a signed, httpOnly, SameSite=Strict cookie (Secure in production) that expires after 8 hours. No password is stored in the cookie or the database.
+- Sign-in attempts are rate-limited (10 per 15 minutes per connection).
 - All admin input is validated on the server (zod); all database queries are parameterised.
 - Admin pages are not indexed by search engines and are sent with `Cache-Control: no-store`.
 

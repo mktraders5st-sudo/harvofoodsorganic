@@ -1,7 +1,7 @@
 "use server";
 
 // Admin server actions. Every action except login starts with requireAdmin(),
-// which checks the session cookie against the database on the server.
+// which applies the admin access rules on the server (see lib/server/auth.ts).
 // Server Actions also reject requests coming from other websites (Origin check).
 
 import { headers } from "next/headers";
@@ -67,8 +67,7 @@ function refreshCatalogPages(productId?: string) {
 /* ---------- Login / logout ---------- */
 
 const loginSchema = z.object({
-  username: z.string().trim().min(1, "Enter your username").max(50),
-  password: z.string().min(1, "Enter your password").max(200),
+  password: z.string().min(1, "Enter the admin password").max(200),
   next: z.string().optional(),
 });
 
@@ -80,7 +79,7 @@ export async function loginAction(_prev: ActionState, fd: FormData): Promise<Act
   const parsed = loginSchema.safeParse(formValues(fd));
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
-  const result = await login(parsed.data.username, parsed.data.password);
+  const result = await login(parsed.data.password);
   if (!result.ok) return { ok: false, message: result.error, values: echo(fd) };
 
   // Only ever redirect inside the admin area (prevents open redirects).
@@ -106,7 +105,7 @@ export async function updateOrderStatusAction(_prev: ActionState, fd: FormData):
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
   try {
-    setOrderStatus(parsed.data.orderNumber, parsed.data.status, admin.username);
+    setOrderStatus(parsed.data.orderNumber, parsed.data.status, admin.name);
   } catch (err) {
     if (err instanceof StatusError) return { ok: false, message: err.message };
     throw err;

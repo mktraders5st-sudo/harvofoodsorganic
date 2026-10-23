@@ -50,15 +50,17 @@ git clone git@github.com:mktraders5st-sudo/harvofoodsorganic.git ~/harvo
 cd ~/harvo
 ```
 
-## 3. Install, build and create your admin
+## 3. Install, build and set the admin password
 
 ```bash
 npm ci
 npm run build
-npm run admin:create -- yourname     # choose a strong password (12+ characters)
+cp .env.example .env.local
+nano .env.local          # set ADMIN_PASSWORD=<a strong password, 12+ characters>, then Ctrl+O, Enter, Ctrl+X
+chmod 600 .env.local     # only your user can read it
 ```
 
-The database is created at `~/harvo/data/harvo.db` the first time the site starts, filled with the starting product list. To keep it elsewhere, copy `.env.example` to `.env.local` and set `HARVO_DB_PATH`.
+Without `ADMIN_PASSWORD` the admin panel stays locked. The database is created at `~/harvo/data/harvo.db` the first time the site starts, filled with the starting product list. To keep it elsewhere, also set `HARVO_DB_PATH` in `.env.local`.
 
 ## 4. Keep it running with PM2
 

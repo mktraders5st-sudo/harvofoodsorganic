@@ -11,26 +11,13 @@ export function LoginForm({ next }: { next?: string }) {
       render={(state) => (
         <>
           {next && <input type="hidden" name="next" value={next} />}
-          <Field label="Username" name="username" error={state.errors?.username}>
-            <input
-              id="username"
-              name="username"
-              autoComplete="username"
-              defaultValue={state.values?.username}
-              autoCapitalize="none"
-              spellCheck={false}
-              required
-              maxLength={50}
-              aria-invalid={!!state.errors?.username}
-              className={adminInput}
-            />
-          </Field>
-          <Field label="Password" name="password" error={state.errors?.password}>
+          <Field label="Admin password" name="password" error={state.errors?.password}>
             <input
               id="password"
               name="password"
               type="password"
               autoComplete="current-password"
+              autoFocus
               required
               maxLength={200}
               aria-invalid={!!state.errors?.password}

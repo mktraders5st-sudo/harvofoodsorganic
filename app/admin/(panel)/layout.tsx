@@ -21,12 +21,20 @@ export default async function AdminPanelLayout({ children }: { children: React.R
             <Link href="/" target="_blank" className="hidden text-forest-100/80 hover:text-white sm:inline">
               View store ↗
             </Link>
-            <span className="hidden text-forest-100/60 md:inline">{admin.username}</span>
-            <form action={logoutAction}>
-              <button type="submit" className="rounded-lg border border-white/20 px-3 py-1.5 font-semibold hover:bg-white/10">
-                Sign out
-              </button>
-            </form>
+            {admin.local ? (
+              <span
+                className="rounded-full bg-amber-300 px-3 py-1 text-xs font-bold text-forest-950"
+                title="No password needed on this computer. The live website asks for the admin password."
+              >
+                Local mode · no login
+              </span>
+            ) : (
+              <form action={logoutAction}>
+                <button type="submit" className="rounded-lg border border-white/20 px-3 py-1.5 font-semibold hover:bg-white/10">
+                  Sign out
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </header>
