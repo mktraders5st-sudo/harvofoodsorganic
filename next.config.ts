@@ -13,7 +13,11 @@ const nextConfig: NextConfig = {
   // Native database driver: load it from node_modules at runtime instead of bundling it.
   serverExternalPackages: ["better-sqlite3"],
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Admin pages hold customer details: never store them in browser or proxy caches.
+      { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+    ];
   },
 };
 

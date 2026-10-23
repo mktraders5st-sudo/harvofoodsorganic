@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { placeOrder } from "@/app/checkout/actions";
+import { placeOrder } from "@/lib/actions/checkout";
 import { useCart } from "@/lib/cart-context";
 import {
   customerSchema,
@@ -11,7 +11,7 @@ import {
   type CustomerInput,
   type FieldErrors,
 } from "@/lib/checkout-schema";
-import { contactInfo } from "@/lib/data";
+import { contactInfo, formatGrams } from "@/lib/data";
 import { cn, formatPrice } from "@/lib/format";
 import type { PlacedOrder } from "@/lib/server/orders";
 import { WhatsAppIcon } from "./icons";
@@ -111,7 +111,7 @@ function OrderPlaced({ order, name, phone }: { order: PlacedOrder; name: string;
 /* ---------- Checkout ---------- */
 
 export function CheckoutView() {
-  const { items, ready, count, subtotal, delivery, total, clear } = useCart();
+  const { items, ready, count, subtotal, delivery, total, hasStockIssue, clear } = useCart();
   const [values, setValues] = useState<Values>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -362,7 +362,7 @@ export function CheckoutView() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
                   <p className="text-xs text-muted">
-                    {item.grams}g · {formatPrice(item.price)} each
+                    {formatGrams(item.grams)} · {formatPrice(item.price)} each
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-forest-900">{formatPrice(item.lineTotal)}</p>
@@ -391,7 +391,21 @@ export function CheckoutView() {
             </p>
           )}
 
-          <button type="submit" disabled={pending} className={buttonClasses("accent", "mt-5 w-full py-4 text-base")}>
+          {hasStockIssue && (
+            <p className="mt-4 rounded-xl bg-tomato-50 p-3 text-sm font-medium text-tomato-700" role="alert">
+              Some items in your cart exceed the stock available.{" "}
+              <Link href="/cart" className="underline">
+                Update your cart
+              </Link>{" "}
+              to continue.
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending || hasStockIssue}
+            className={buttonClasses("accent", "mt-5 w-full py-4 text-base")}
+          >
             {pending ? "Placing order…" : `Place Order · ${formatPrice(total)}`}
           </button>
           <p className="mt-3 text-center text-xs text-muted">

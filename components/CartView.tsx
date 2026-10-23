@@ -1,7 +1,7 @@
 "use client";
 
 import { MAX_QTY, useCart, type CartItem } from "@/lib/cart-context";
-import { contactInfo, FREE_DELIVERY_MIN, getCategory, PACK_SIZES, type Grams } from "@/lib/data";
+import { contactInfo, formatGrams, FREE_DELIVERY_MIN, getCategory } from "@/lib/data";
 import { cn, formatPrice } from "@/lib/format";
 import { TrashIcon, WhatsAppIcon } from "./icons";
 import { ProductImage } from "./ProductImage";
@@ -9,7 +9,17 @@ import { buttonClasses, ButtonLink } from "./ui";
 
 /* ---------- Building blocks ---------- */
 
-function QuantityStepper({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+function QuantityStepper({
+  value,
+  max,
+  onChange,
+  label,
+}: {
+  value: number;
+  max: number;
+  onChange: (n: number) => void;
+  label: string;
+}) {
   const btn =
     "grid h-10 w-10 place-items-center rounded-full text-xl text-forest-900 transition-colors hover:bg-cream-200 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent";
   return (
@@ -21,51 +31,63 @@ function QuantityStepper({ value, onChange, label }: { value: number; onChange: 
         type="number"
         inputMode="numeric"
         min={1}
-        max={MAX_QTY}
+        max={max}
         value={value}
         onChange={(e) => {
           const n = parseInt(e.target.value, 10);
-          if (!Number.isNaN(n) && n > 0) onChange(n);
+          if (!Number.isNaN(n) && n > 0) onChange(Math.min(n, max));
         }}
         aria-label="Quantity"
         className="w-9 rounded bg-transparent text-center text-sm font-semibold outline-none focus:bg-cream-100 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
-      <button type="button" className={btn} onClick={() => onChange(value + 1)} disabled={value >= MAX_QTY} aria-label="Increase quantity">
+      <button type="button" className={btn} onClick={() => onChange(value + 1)} disabled={value >= max} aria-label="Increase quantity">
         +
       </button>
     </div>
   );
 }
 
-function SizePicker({ item, onChange }: { item: CartItem; onChange: (g: Grams) => void }) {
+function SizePicker({ item, onChange }: { item: CartItem; onChange: (grams: number) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={`Pack size for ${item.name}`}>
-      {PACK_SIZES.map((g) => (
-        <button
-          key={g}
-          type="button"
-          role="radio"
-          aria-checked={g === item.grams}
-          onClick={() => onChange(g)}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-            g === item.grams
-              ? "border-forest-700 bg-forest-700 text-white"
-              : "border-cream-200 bg-white text-forest-900 hover:border-forest-500",
-          )}
-        >
-          {g}g · {formatPrice(item.prices[g])}
-        </button>
-      ))}
+      {item.variants.map((v) => {
+        const selected = v.grams === item.grams;
+        const out = v.stock <= 0;
+        return (
+          <button
+            key={v.grams}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={out && !selected}
+            onClick={() => onChange(v.grams)}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:line-through disabled:opacity-50",
+              selected
+                ? "border-forest-700 bg-forest-700 text-white"
+                : "border-cream-200 bg-white text-forest-900 hover:border-forest-500",
+            )}
+          >
+            {formatGrams(v.grams)} · {formatPrice(v.price)}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 function CartLineRow({ item }: { item: CartItem }) {
   const { setQty, changeSize, remove } = useCart();
+  const max = Math.max(1, Math.min(MAX_QTY, item.stock));
+  const tooMany = item.qty > item.stock;
 
   return (
-    <li className="flex gap-3 rounded-2xl border border-cream-200 bg-white p-3 sm:gap-5 sm:p-4">
+    <li
+      className={cn(
+        "flex gap-3 rounded-2xl border bg-white p-3 sm:gap-5 sm:p-4",
+        tooMany ? "border-tomato-500" : "border-cream-200",
+      )}
+    >
       <ProductImage product={item} className="h-24 w-24 shrink-0 rounded-xl sm:h-28 sm:w-28" />
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -77,7 +99,7 @@ function CartLineRow({ item }: { item: CartItem }) {
           <button
             type="button"
             onClick={() => remove(item.key)}
-            aria-label={`Remove ${item.name} ${item.grams}g`}
+            aria-label={`Remove ${item.name} ${formatGrams(item.grams)}`}
             className="-mr-1 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-tomato-50 hover:text-tomato-600"
           >
             <TrashIcon className="h-[18px] w-[18px]" />
@@ -87,12 +109,20 @@ function CartLineRow({ item }: { item: CartItem }) {
         <SizePicker item={item} onChange={(g) => changeSize(item.key, g)} />
 
         <div className="flex items-center justify-between gap-3">
-          <QuantityStepper value={item.qty} onChange={(n) => setQty(item.key, n)} label={item.name} />
+          <QuantityStepper value={item.qty} max={max} onChange={(n) => setQty(item.key, n)} label={item.name} />
           <div className="text-right">
             <p className="font-bold text-forest-900">{formatPrice(item.lineTotal)}</p>
             {item.qty > 1 && <p className="text-[11px] text-muted">{formatPrice(item.price)} each</p>}
           </div>
         </div>
+
+        {tooMany && (
+          <p className="text-xs font-medium text-tomato-600" role="alert">
+            {item.stock === 0
+              ? "This size is now out of stock. Choose another size or remove it."
+              : `Only ${item.stock} left in stock. Please reduce the quantity.`}
+          </p>
+        )}
       </div>
     </li>
   );
@@ -103,7 +133,7 @@ function whatsappOrderLink(items: CartItem[], subtotal: number, delivery: number
   const lines = [
     "Assalam-o-Alaikum Harvo! I'd like to order:",
     "",
-    ...items.map((i) => `• ${i.name} (${i.grams}g) × ${i.qty} = ${formatPrice(i.lineTotal)}`),
+    ...items.map((i) => `• ${i.name} (${formatGrams(i.grams)}) × ${i.qty} = ${formatPrice(i.lineTotal)}`),
     "",
     `Subtotal: ${formatPrice(subtotal)}`,
     `Delivery: ${delivery === 0 ? "Free" : formatPrice(delivery)}`,
@@ -112,10 +142,25 @@ function whatsappOrderLink(items: CartItem[], subtotal: number, delivery: number
   return `${contactInfo.whatsappLink}?text=${encodeURIComponent(lines.join("\n"))}`;
 }
 
+function CheckoutButton({ blocked, className, children }: { blocked: boolean; className: string; children: React.ReactNode }) {
+  if (blocked) {
+    return (
+      <span aria-disabled="true" className={buttonClasses("accent", cn(className, "cursor-not-allowed opacity-50"))}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <ButtonLink href="/checkout" variant="accent" className={className}>
+      {children}
+    </ButtonLink>
+  );
+}
+
 /* ---------- Cart page ---------- */
 
 export function CartView() {
-  const { items, ready, count, subtotal, delivery, total, clear } = useCart();
+  const { items, ready, count, subtotal, delivery, total, hasStockIssue, clear } = useCart();
 
   if (!ready) return <div className="min-h-64" aria-busy="true" />;
 
@@ -195,15 +240,16 @@ export function CartView() {
           </div>
         </dl>
 
-        <ButtonLink href="/checkout" variant="accent" className="mt-6 hidden w-full py-3.5 text-base lg:flex">
+        {hasStockIssue && (
+          <p className="mt-4 rounded-xl bg-tomato-50 p-3 text-xs font-medium text-tomato-700" role="alert">
+            Some items exceed the stock available. Please adjust them to continue.
+          </p>
+        )}
+
+        <CheckoutButton blocked={hasStockIssue} className="mt-6 hidden w-full py-3.5 text-base lg:flex">
           Proceed to Checkout →
-        </ButtonLink>
-        <a
-          href={orderLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={buttonClasses("outline", "mt-3 w-full")}
-        >
+        </CheckoutButton>
+        <a href={orderLink} target="_blank" rel="noopener noreferrer" className={buttonClasses("outline", "mt-3 w-full")}>
           <WhatsAppIcon className="h-5 w-5" /> Order on WhatsApp instead
         </a>
         <p className="mt-3 text-center text-xs text-muted">Cash on delivery · No card details needed</p>
@@ -216,9 +262,9 @@ export function CartView() {
             <p className="text-[11px] text-muted">Total ({count} items)</p>
             <p className="text-lg font-bold leading-tight text-forest-900">{formatPrice(total)}</p>
           </div>
-          <ButtonLink href="/checkout" variant="accent" className="ml-auto flex-1 py-3.5 text-sm">
+          <CheckoutButton blocked={hasStockIssue} className="ml-auto flex-1 py-3.5 text-sm">
             Checkout →
-          </ButtonLink>
+          </CheckoutButton>
         </div>
       </div>
     </div>

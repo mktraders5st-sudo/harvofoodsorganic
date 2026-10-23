@@ -1,9 +1,5 @@
-// Catalogue content. Product names come from the Harvo flyer.
-// Prices live in ./prices.ts. Ratings and items marked "(example)" are placeholders.
-
-import { prices, type Grams, type PackPrices, type PricedProductId } from "./prices";
-
-export { PACK_SIZES, type Grams } from "./prices";
+// Shared catalogue types and static site content.
+// Products, prices, package sizes and stock live in the database and are managed in /admin.
 
 export type CategoryId =
   | "vegetable-powders"
@@ -20,11 +16,22 @@ export type Category = {
   tint: string;
 };
 
+/** A package size of a product, with its own price (PKR) and stock. */
+export type Variant = {
+  id: number;
+  grams: number;
+  price: number;
+  stock: number;
+  active: boolean;
+};
+
+export type Badge = "Best Seller" | "New";
+
 export type Product = {
-  id: PricedProductId;
+  id: string;
   name: string;
   category: CategoryId;
-  prices: PackPrices;
+  description: string;
   /** Main colour of the product, used for its generated pack image. */
   color: string;
   /** Optional skin/rim colour for slices (e.g. red for apple). */
@@ -33,9 +40,10 @@ export type Product = {
   image?: string;
   rating: number;
   reviews: number;
-  badge?: "Best Seller" | "New";
-  featured?: boolean;
-  description: string;
+  badge?: Badge;
+  featured: boolean;
+  active: boolean;
+  variants: Variant[];
 };
 
 export type Recipe = {
@@ -87,37 +95,7 @@ export const categories: Category[] = [
   },
 ];
 
-type ProductInput = Omit<Product, "prices">;
-
-const productList: ProductInput[] = [
-  // Powders
-  { id: "onion-powder", name: "Onion Powder", category: "vegetable-powders", color: "#e8d6b5", rating: 5, reviews: 84, badge: "Best Seller", featured: true, description: "Sun-dried onions, finely ground for curries, marinades and dips." },
-  { id: "tomato-powder", name: "Tomato Powder", category: "vegetable-powders", color: "#d8432f", rating: 5, reviews: 61, featured: true, description: "Rich tomato flavour for soups, gravies and sauces." },
-  { id: "green-chilli-powder", name: "Green Chilli Powder", category: "vegetable-powders", color: "#5f9f35", rating: 4, reviews: 29, featured: true, description: "Fresh, sharp heat from dried green chillies." },
-  { id: "beetroot-powder", name: "Beetroot Powder", category: "vegetable-powders", color: "#9b1d4c", rating: 4, reviews: 38, badge: "New", featured: true, description: "Natural colour and nutrition for smoothies and baking." },
-  { id: "mint-powder", name: "Mint Powder", category: "spice-powders", color: "#4a9a56", rating: 4, reviews: 26, description: "Cool dried mint for raita, chutneys and drinks." },
-  { id: "garlic-powder", name: "Garlic Powder", category: "vegetable-powders", color: "#efe5c8", rating: 5, reviews: 72, description: "Pure dehydrated garlic with no fillers." },
-  { id: "ginger-powder", name: "Ginger Powder", category: "spice-powders", color: "#d6ae62", rating: 5, reviews: 57, description: "Warming dried ginger for tea, curries and baking." },
-  { id: "coriander-powder", name: "Coriander Powder", category: "spice-powders", color: "#9c944b", rating: 5, reviews: 49, description: "Freshly ground coriander with a citrusy aroma." },
-
-  // Fruit powders (example items: the flyer doesn't list any yet)
-  { id: "mango-powder", name: "Mango Powder", category: "fruit-powders", color: "#f2ad35", rating: 5, reviews: 33, description: "Sweet ripe mango powder for shakes and desserts. (example)" },
-  { id: "banana-powder", name: "Banana Powder", category: "fruit-powders", color: "#f0d98a", rating: 4, reviews: 18, description: "Naturally sweet banana powder for smoothies and baking. (example)" },
-  { id: "orange-peel-powder", name: "Orange Peel Powder", category: "fruit-powders", color: "#ee8526", rating: 4, reviews: 14, description: "Zesty orange peel for baking and drinks. (example)" },
-
-  // Dried fruit slices
-  { id: "banana-slices", name: "Banana Slices", category: "dried-slices", color: "#f2d77c", rim: "#d8b04a", rating: 5, reviews: 45, featured: true, description: "Crispy dehydrated banana, no sugar added." },
-  { id: "apple-slices", name: "Apple Slices", category: "dried-slices", color: "#f4e4b8", rim: "#c42d2d", rating: 5, reviews: 52, badge: "Best Seller", featured: true, description: "Light, crunchy apple rings, a perfect healthy snack." },
-  { id: "orange-slices", name: "Orange Slices", category: "dried-slices", color: "#f29a3a", rim: "#d9671b", rating: 4, reviews: 21, description: "Tangy dried orange wheels for snacking and garnish." },
-  { id: "mango-slices", name: "Mango Slices", category: "dried-slices", color: "#f6a92a", rim: "#e08a12", rating: 5, reviews: 39, featured: true, description: "Chewy, naturally sweet mango slices." },
-  { id: "raw-mango-slices", name: "Raw Mango Slices", category: "dried-slices", color: "#c9cf6a", rim: "#7e9a2e", rating: 4, reviews: 17, description: "Sour raw mango slices, great with chat masala." },
-
-  // Seasoning & blends
-  { id: "chat-masala", name: "Chat Masala", category: "seasonings", color: "#b4552d", rating: 5, reviews: 93, badge: "Best Seller", featured: true, description: "Tangy, spicy blend for fruit chaat, salads and snacks." },
-  { id: "mixed-herb-seasoning", name: "Mixed Herb Seasoning", category: "seasonings", color: "#6f8f3a", rating: 4, reviews: 12, badge: "New", description: "Dried herb blend for pasta, pizza and grills. (example)" },
-];
-
-export const products: Product[] = productList.map((p) => ({ ...p, prices: prices[p.id] }));
+export const CATEGORY_IDS = categories.map((c) => c.id) as [CategoryId, ...CategoryId[]];
 
 export const recipes: Recipe[] = [
   { id: "fruit-chaat", title: "Tangy Fruit Chaat", excerpt: "Fresh fruit tossed with Harvo chat masala and a squeeze of lemon.", minutes: 10, serves: 4, difficulty: "Easy", tag: "Snack", ingredients: ["chat-masala", "apple-slices"] },
@@ -145,22 +123,29 @@ export const contactInfo = {
 
 export { DELIVERY_FEE, FREE_DELIVERY_MIN } from "./pricing";
 
-export function getProduct(id: string) {
-  return products.find((p) => p.id === id);
-}
+/** Show at or below this many packs as "Only N left". */
+export const LOW_STOCK = 5;
 
 export function getCategory(id: CategoryId) {
-  return categories.find((c) => c.id === id)!;
-}
-
-export function countInCategory(id: CategoryId) {
-  return products.filter((p) => p.category === id).length;
+  return categories.find((c) => c.id === id) ?? categories[0];
 }
 
 export function startingPrice(product: Product) {
-  return Math.min(...Object.values(product.prices));
+  const prices = product.variants.map((v) => v.price);
+  return prices.length ? Math.min(...prices) : 0;
 }
 
-export function priceFor(product: Product, grams: Grams) {
-  return product.prices[grams];
+export function inStock(product: Product) {
+  return product.variants.some((v) => v.stock > 0);
+}
+
+/** 250 → "250g", 1000 → "1kg", 1500 → "1.5kg" */
+export function formatGrams(grams: number) {
+  return grams >= 1000 ? `${grams / 1000}kg` : `${grams}g`;
+}
+
+export function countByCategory(products: Product[]) {
+  const counts = Object.fromEntries(categories.map((c) => [c.id, 0])) as Record<CategoryId, number>;
+  for (const p of products) counts[p.category]++;
+  return counts;
 }

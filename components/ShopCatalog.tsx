@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { categories, getCategory, products, startingPrice, type CategoryId, type Product } from "@/lib/data";
+import { categories, getCategory, startingPrice, type CategoryId, type Product } from "@/lib/data";
 import { cn } from "@/lib/format";
 import { ProductGrid } from "./cards";
 import { SearchIcon } from "./icons";
@@ -16,9 +16,11 @@ const sorters: Record<Sort, (a: Product, b: Product) => number> = {
 };
 
 export function ShopCatalog({
+  products,
   initialCategory,
   initialQuery = "",
 }: {
+  products: Product[];
   initialCategory?: CategoryId;
   initialQuery?: string;
 }) {
@@ -32,7 +34,7 @@ export function ShopCatalog({
       !q || p.name.toLowerCase().includes(q) || getCategory(p.category).name.toLowerCase().includes(q);
     const list = products.filter((p) => (category === "all" || p.category === category) && matches(p));
     return [...list].sort(sorters[sort]);
-  }, [category, query, sort]);
+  }, [products, category, query, sort]);
 
   const chips: { id: CategoryId | "all"; name: string }[] = [{ id: "all", name: "All" }, ...categories];
 

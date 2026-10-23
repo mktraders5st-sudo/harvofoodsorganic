@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { countInCategory, type Category, type Product, type Recipe } from "@/lib/data";
+import type { Category, CategoryId, Product, Recipe } from "@/lib/data";
 import { cn } from "@/lib/format";
 import { ClockIcon, UsersIcon } from "./icons";
 import { ProductCard } from "./ProductCard";
@@ -18,7 +18,15 @@ export function ProductGrid({ products }: { products: Product[] }) {
   );
 }
 
-export function CategoryCard({ category, className }: { category: Category; className?: string }) {
+export function CategoryCard({
+  category,
+  count,
+  className,
+}: {
+  category: Category;
+  count: number;
+  className?: string;
+}) {
   return (
     <Link
       href={`/shop?category=${category.id}`}
@@ -36,7 +44,9 @@ export function CategoryCard({ category, className }: { category: Category; clas
       />
       <div className="absolute inset-0 bg-gradient-to-t from-forest-950/90 via-forest-950/30 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-        <p className="text-[11px] font-medium text-forest-100/90">{countInCategory(category.id)} products</p>
+        <p className="text-[11px] font-medium text-forest-100/90">
+          {count} {count === 1 ? "product" : "products"}
+        </p>
         <h3 className="mt-0.5 font-serif text-lg font-bold leading-tight text-white sm:text-xl">{category.name}</h3>
         <p className="mt-1 hidden text-xs text-white/80 sm:block">{category.blurb}</p>
         <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-tomato-600 px-3 py-1.5 text-[11px] font-semibold transition-colors group-hover:bg-tomato-500">
@@ -47,7 +57,13 @@ export function CategoryCard({ category, className }: { category: Category; clas
   );
 }
 
-export function CategoryGrid({ categories }: { categories: Category[] }) {
+export function CategoryGrid({
+  categories,
+  counts,
+}: {
+  categories: Category[];
+  counts: Record<CategoryId, number>;
+}) {
   const oddCount = categories.length % 2 === 1;
 
   return (
@@ -56,6 +72,7 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
         <CategoryCard
           key={c.id}
           category={c}
+          count={counts[c.id]}
           // On phones, stretch a lone last card across both columns
           className={
             oddCount && i === categories.length - 1

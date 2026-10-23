@@ -3,13 +3,17 @@ import { RecipeCard } from "@/components/cards";
 import { ClockIcon, UsersIcon } from "@/components/icons";
 import { Newsletter } from "@/components/Newsletter";
 import { ButtonLink, Eyebrow, ImagePlaceholder, PageHero, Section } from "@/components/ui";
-import { getProduct, recipes } from "@/lib/data";
+import { recipes } from "@/lib/data";
+import { getCatalog } from "@/lib/server/catalog";
 
 export const metadata: Metadata = { title: "Recipes" };
 
 export default function RecipesPage() {
   const [featured, ...rest] = recipes;
-  const featuredIngredients = featured.ingredients.map(getProduct).filter((p) => p !== undefined);
+  const catalog = getCatalog();
+  const featuredIngredients = featured.ingredients
+    .map((id) => catalog.find((p) => p.id === id))
+    .filter((p) => p !== undefined);
 
   return (
     <>

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useCart } from "@/lib/cart-context";
-import type { Grams } from "@/lib/data";
 import { cn } from "@/lib/format";
 
 export function AddToCartButton({
@@ -11,7 +10,7 @@ export function AddToCartButton({
   className,
 }: {
   productId: string;
-  grams: Grams;
+  grams: number;
   className?: string;
 }) {
   const { add } = useCart();

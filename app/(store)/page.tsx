@@ -4,11 +4,13 @@ import { TrustStrip, ValueGrid } from "@/components/FeatureList";
 import { LeafIcon, WhatsAppIcon } from "@/components/icons";
 import { Newsletter } from "@/components/Newsletter";
 import { ButtonLink, Container, Eyebrow, Section, SectionHeading } from "@/components/ui";
-import { categories, contactInfo, products } from "@/lib/data";
+import { categories, contactInfo, countByCategory } from "@/lib/data";
+import { getCatalog } from "@/lib/server/catalog";
 
 const packSizes = ["50 g", "100 g", "250 g"];
 
 export default function HomePage() {
+  const products = getCatalog();
   const featured = products.filter((p) => p.featured).slice(0, 8);
 
   return (
@@ -87,7 +89,7 @@ export default function HomePage() {
             title="Explore our organic range"
             text="Five ranges, one promise: pure, natural and full of flavour."
           />
-          <CategoryGrid categories={categories} />
+          <CategoryGrid categories={categories} counts={countByCategory(products)} />
         </Container>
       </section>
 

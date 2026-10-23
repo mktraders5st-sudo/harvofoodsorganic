@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { PACK_SIZES } from "./prices";
 
 // One set of rules, used for instant feedback in the browser AND enforced
 // again on the server, which never trusts what the browser sends.
@@ -62,7 +61,7 @@ export const customerSchema = z.object({
 
 export const orderItemSchema = z.object({
   id: z.string().trim().min(1).max(60),
-  grams: z.union([z.literal(50), z.literal(100), z.literal(250)]) satisfies z.ZodType<(typeof PACK_SIZES)[number]>,
+  grams: z.number().int().min(1).max(100000),
   qty: z.number().int().min(1).max(99),
 });
 
