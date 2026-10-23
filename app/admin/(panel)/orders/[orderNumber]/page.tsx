@@ -21,10 +21,10 @@ const waNumber = (phone: string) => `92${phone.slice(1)}`;
 export default async function AdminOrderPage({ params }: Props) {
   await requireAdmin();
   const { orderNumber } = await params;
-  const order = getOrder(orderNumber);
+  const order = await getOrder(orderNumber);
   if (!order) notFound();
 
-  const otherOrders = ordersByPhone(order.phone, order.orderNumber);
+  const otherOrders = await ordersByPhone(order.phone, order.orderNumber);
   const waText = encodeURIComponent(
     `Assalam-o-Alaikum ${order.customerName}, this is Harvo Foods Organic about your order ${order.orderNumber} (total ${formatPrice(order.total)}).`,
   );

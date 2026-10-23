@@ -25,7 +25,7 @@ export default async function ShopPage({
         {/* key resets the filters when arriving from a category link or the header search */}
         <ShopCatalog
           key={`${initialCategory ?? "all"}|${q}`}
-          products={getCatalog()}
+          products={await getCatalog()}
           initialCategory={initialCategory}
           initialQuery={q}
         />

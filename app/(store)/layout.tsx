@@ -6,8 +6,8 @@ import { getCatalog } from "@/lib/server/catalog";
 // Prices and stock change from the admin panel, so always render with fresh data.
 export const dynamic = "force-dynamic";
 
-export default function StoreLayout({ children }: { children: React.ReactNode }) {
-  const catalog = getCatalog();
+export default async function StoreLayout({ children }: { children: React.ReactNode }) {
+  const catalog = await getCatalog();
 
   return (
     <CartProvider catalog={catalog}>

@@ -10,7 +10,7 @@ import { getProductById } from "@/lib/server/catalog";
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const product = getProductById((await params).id);
+  const product = await getProductById((await params).id);
   return { title: product ? `Edit ${product.name}` : "Product" };
 }
 
@@ -18,7 +18,7 @@ export default async function EditProductPage({ params, searchParams }: Props) {
   await requireAdmin();
   const { id } = await params;
   const { created } = await searchParams;
-  const product = getProductById(id);
+  const product = await getProductById(id);
   if (!product) notFound();
 
   return (

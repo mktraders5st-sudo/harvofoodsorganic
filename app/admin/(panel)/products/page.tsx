@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Products" };
 
 export default async function AdminProductsPage() {
   await requireAdmin();
-  const products = getCatalog({ includeInactive: true });
+  const products = await getCatalog({ includeInactive: true });
 
   return (
     <div className="space-y-5">

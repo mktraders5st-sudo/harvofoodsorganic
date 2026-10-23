@@ -26,12 +26,12 @@ export async function placeOrder(input: OrderInput): Promise<PlaceOrderResult> {
   // Counts only valid order attempts, so fixing form mistakes never locks a customer out.
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-  if (!rateLimit(`order:${ip}`, 5, 10 * 60 * 1000)) {
+  if (!(await rateLimit(`order:${ip}`, 5, 10 * 60 * 1000))) {
     return { ok: false, error: "Too many orders from this connection. Please wait a few minutes and try again." };
   }
 
   try {
-    return { ok: true, order: createOrder(parsed.data) };
+    return { ok: true, order: await createOrder(parsed.data) };
   } catch (err) {
     if (err instanceof OrderError) return { ok: false, error: err.message };
     // Log the failure without customer details.

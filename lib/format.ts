@@ -13,9 +13,9 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-PK", {
   minute: "2-digit",
 });
 
-/** SQLite UTC timestamp ("2026-10-23 02:07:53") shown in Pakistan time. */
-export function formatDateTime(sqlUtc: string) {
-  return dateTimeFormatter.format(new Date(`${sqlUtc.replace(" ", "T")}Z`));
+/** A database timestamp shown in Pakistan time. */
+export function formatDateTime(value: Date | string) {
+  return dateTimeFormatter.format(value instanceof Date ? value : new Date(value));
 }
 
 export function cn(...classes: (string | false | null | undefined)[]) {

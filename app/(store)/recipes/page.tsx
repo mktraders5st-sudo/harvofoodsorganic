@@ -8,9 +8,9 @@ import { getCatalog } from "@/lib/server/catalog";
 
 export const metadata: Metadata = { title: "Recipes" };
 
-export default function RecipesPage() {
+export default async function RecipesPage() {
   const [featured, ...rest] = recipes;
-  const catalog = getCatalog();
+  const catalog = await getCatalog();
   const featuredIngredients = featured.ingredients
     .map((id) => catalog.find((p) => p.id === id))
     .filter((p) => p !== undefined);

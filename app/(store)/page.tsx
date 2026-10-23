@@ -9,8 +9,8 @@ import { getCatalog } from "@/lib/server/catalog";
 
 const packSizes = ["50 g", "100 g", "250 g"];
 
-export default function HomePage() {
-  const products = getCatalog();
+export default async function HomePage() {
+  const products = await getCatalog();
   const featured = products.filter((p) => p.featured).slice(0, 8);
 
   return (

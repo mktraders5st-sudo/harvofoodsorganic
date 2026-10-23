@@ -1,7 +1,7 @@
-// Server-only: order queries and updates for the admin panel.
+// Server-only: order queries and updates for the admin panel (Supabase / PostgreSQL).
 // Callers must check admin access (requireAdmin) first.
 
-import { getDb } from "./db";
+import { db } from "./db";
 
 export const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -15,6 +15,9 @@ export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
   cancelled: [],
 };
 
+/** Dashboard dates are counted in Pakistan time. */
+const SHOP_TIME_ZONE = "Asia/Karachi";
+
 export type OrderSummary = {
   orderNumber: string;
   status: OrderStatus;
@@ -23,7 +26,7 @@ export type OrderSummary = {
   city: string;
   total: number;
   itemCount: number;
-  createdAt: string;
+  createdAt: Date;
 };
 
 export type OrderDetail = OrderSummary & {
@@ -34,130 +37,109 @@ export type OrderDetail = OrderSummary & {
   paymentMethod: "COD";
   subtotal: number;
   deliveryFee: number;
-  updatedAt: string;
+  updatedAt: Date;
   items: { productId: string; productName: string; grams: number; unitPrice: number; qty: number; lineTotal: number }[];
-  history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; changedBy: string; changedAt: string }[];
+  history: { fromStatus: OrderStatus | null; toStatus: OrderStatus; changedBy: string; changedAt: Date }[];
 };
 
 const SUMMARY_COLUMNS = `
-  o.order_number AS orderNumber, o.status, o.customer_name AS customerName, o.phone, o.city, o.total,
-  o.created_at AS createdAt,
-  (SELECT COALESCE(SUM(qty), 0) FROM order_items WHERE order_id = o.id) AS itemCount`;
+  o.order_number as "orderNumber", o.status, o.customer_name as "customerName", o.phone, o.city, o.total,
+  o.created_at as "createdAt",
+  (select coalesce(sum(qty), 0)::int from order_items where order_id = o.id) as "itemCount"`;
 
 export const PAGE_SIZE = 25;
 
-export function listOrders({ status, q, page = 1 }: { status?: OrderStatus; q?: string; page?: number }) {
-  const where: string[] = [];
-  const params: Record<string, string | number> = {};
-  if (status) {
-    where.push("o.status = @status");
-    params.status = status;
-  }
+export async function listOrders({ status, q, page = 1 }: { status?: OrderStatus; q?: string; page?: number }) {
+  const sql = db();
   const search = q?.trim();
-  if (search) {
-    // Matches order number, customer name, or phone (digits only, so "0300-123" finds "0300123…").
-    where.push("(o.order_number LIKE @like OR o.customer_name LIKE @like OR o.phone LIKE @digits)");
-    params.like = `%${search}%`;
-    params.digits = `%${search.replace(/\D/g, "") || search}%`;
-  }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  // Matches order number or customer name, or phone by digits only ("0300-123" finds "0300123…").
+  const like = search ? `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+  const digits = search ? `%${search.replace(/\D/g, "") || search}%` : null;
 
-  const db = getDb();
-  const countStmt = db.prepare(`SELECT COUNT(*) AS total FROM orders o ${whereSql}`);
-  const { total } = (where.length ? countStmt.get(params) : countStmt.get()) as { total: number };
-  const orders = db
-    .prepare(
-      `SELECT ${SUMMARY_COLUMNS} FROM orders o ${whereSql}
-       ORDER BY o.id DESC LIMIT ${PAGE_SIZE} OFFSET @offset`,
-    )
-    .all({ ...params, offset: (Math.max(1, page) - 1) * PAGE_SIZE }) as OrderSummary[];
+  const where = sql`
+    where true
+    ${status ? sql`and o.status = ${status}` : sql``}
+    ${like ? sql`and (o.order_number ilike ${like} or o.customer_name ilike ${like} or o.phone like ${digits})` : sql``}`;
+
+  const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
+  const [[{ total }], orders] = await Promise.all([
+    sql<{ total: number }[]>`select count(*)::int as total from orders o ${where}`,
+    sql<OrderSummary[]>`
+      select ${sql.unsafe(SUMMARY_COLUMNS)} from orders o ${where}
+      order by o.id desc limit ${PAGE_SIZE} offset ${offset}`,
+  ]);
 
   return { orders, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
-export function getOrder(orderNumber: string): OrderDetail | undefined {
-  const db = getDb();
-  const order = db
-    .prepare(
-      `SELECT o.id, ${SUMMARY_COLUMNS}, o.email, o.address, o.notes, o.payment_method AS paymentMethod,
-              o.subtotal, o.delivery_fee AS deliveryFee, o.updated_at AS updatedAt
-       FROM orders o WHERE o.order_number = ?`,
-    )
-    .get(orderNumber) as Omit<OrderDetail, "items" | "history"> | undefined;
+export async function getOrder(orderNumber: string): Promise<OrderDetail | undefined> {
+  const sql = db();
+  const [order] = await sql<Omit<OrderDetail, "items" | "history">[]>`
+    select o.id, ${sql.unsafe(SUMMARY_COLUMNS)}, o.email, o.address, o.notes, o.payment_method as "paymentMethod",
+           o.subtotal, o.delivery_fee as "deliveryFee", o.updated_at as "updatedAt"
+    from orders o where o.order_number = ${orderNumber}`;
   if (!order) return undefined;
 
-  const items = db
-    .prepare(
-      `SELECT product_id AS productId, product_name AS productName, grams, unit_price AS unitPrice, qty,
-              line_total AS lineTotal
-       FROM order_items WHERE order_id = ? ORDER BY id`,
-    )
-    .all(order.id) as OrderDetail["items"];
-  const history = db
-    .prepare(
-      `SELECT from_status AS fromStatus, to_status AS toStatus, changed_by AS changedBy, changed_at AS changedAt
-       FROM order_status_history WHERE order_id = ? ORDER BY id`,
-    )
-    .all(order.id) as OrderDetail["history"];
+  const [items, history] = await Promise.all([
+    sql<OrderDetail["items"]>`
+      select product_id as "productId", product_name as "productName", grams, unit_price as "unitPrice", qty,
+             line_total as "lineTotal"
+      from order_items where order_id = ${order.id} order by id`,
+    sql<OrderDetail["history"]>`
+      select from_status as "fromStatus", to_status as "toStatus", changed_by as "changedBy", changed_at as "changedAt"
+      from order_status_history where order_id = ${order.id} order by id`,
+  ]);
 
   return { ...order, items, history };
 }
 
 /** Other orders from the same phone number, newest first. */
-export function ordersByPhone(phone: string, excludeOrderNumber: string) {
-  return getDb()
-    .prepare(
-      `SELECT ${SUMMARY_COLUMNS} FROM orders o
-       WHERE o.phone = ? AND o.order_number != ? ORDER BY o.id DESC LIMIT 20`,
-    )
-    .all(phone, excludeOrderNumber) as OrderSummary[];
+export async function ordersByPhone(phone: string, excludeOrderNumber: string) {
+  const sql = db();
+  return sql<OrderSummary[]>`
+    select ${sql.unsafe(SUMMARY_COLUMNS)} from orders o
+    where o.phone = ${phone} and o.order_number <> ${excludeOrderNumber}
+    order by o.id desc limit 20`;
 }
 
 export class StatusError extends Error {}
 
 /** Moves an order to a new status. Cancelling returns its items to stock. */
-export function setOrderStatus(orderNumber: string, to: OrderStatus, changedBy: string) {
-  const db = getDb();
-  db.transaction(() => {
-    const order = db.prepare("SELECT id, status FROM orders WHERE order_number = ?").get(orderNumber) as
-      | { id: number; status: OrderStatus }
-      | undefined;
+export async function setOrderStatus(orderNumber: string, to: OrderStatus, changedBy: string) {
+  await db().begin(async (sql) => {
+    // Lock the order row so two admins can't change it at the same time.
+    const [order] = await sql<{ id: number; status: OrderStatus }[]>`
+      select id, status from orders where order_number = ${orderNumber} for update`;
     if (!order) throw new StatusError("Order not found.");
     if (!NEXT_STATUSES[order.status].includes(to)) {
       throw new StatusError(`An order that is ${order.status} can't be changed to ${to}.`);
     }
 
-    db.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?").run(to, order.id);
-    db.prepare(
-      "INSERT INTO order_status_history (order_id, from_status, to_status, changed_by) VALUES (?, ?, ?, ?)",
-    ).run(order.id, order.status, to, changedBy);
+    await sql`update orders set status = ${to}, updated_at = now() where id = ${order.id}`;
+    await sql`
+      insert into order_status_history (order_id, from_status, to_status, changed_by)
+      values (${order.id}, ${order.status}, ${to}, ${changedBy})`;
 
     if (to === "cancelled") {
-      db.prepare(
-        `UPDATE product_variants SET stock = stock + (
-           SELECT SUM(i.qty) FROM order_items i
-           WHERE i.order_id = @orderId AND i.product_id = product_variants.product_id AND i.grams = product_variants.grams)
-         WHERE EXISTS (
-           SELECT 1 FROM order_items i
-           WHERE i.order_id = @orderId AND i.product_id = product_variants.product_id AND i.grams = product_variants.grams)`,
-      ).run({ orderId: order.id });
+      await sql`
+        update product_variants v set stock = v.stock + i.qty
+        from (select product_id, grams, sum(qty)::int as qty from order_items where order_id = ${order.id}
+              group by product_id, grams) i
+        where v.product_id = i.product_id and v.grams = i.grams`;
     }
-  })();
+  });
 }
 
-export function dashboardStats() {
-  const db = getDb();
-  const one = <T>(sql: string) => db.prepare(sql).get() as T;
-  return {
-    pending: one<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'").n,
-    toDispatch: one<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status = 'confirmed'").n,
-    // Pakistan time is UTC+5: count "today" in Karachi, not UTC.
-    today: one<{ n: number }>(
-      "SELECT COUNT(*) AS n FROM orders WHERE date(created_at, '+5 hours') = date('now', '+5 hours')",
-    ).n,
-    monthSales: one<{ s: number }>(
-      `SELECT COALESCE(SUM(total), 0) AS s FROM orders
-       WHERE status != 'cancelled' AND strftime('%Y-%m', created_at, '+5 hours') = strftime('%Y-%m', 'now', '+5 hours')`,
-    ).s,
-  };
+export async function dashboardStats() {
+  const [s] = await db()<{ pending: number; toDispatch: number; today: number; monthSales: number }[]>`
+    select
+      count(*) filter (where status = 'pending')::int as pending,
+      count(*) filter (where status = 'confirmed')::int as "toDispatch",
+      count(*) filter (where (created_at at time zone ${SHOP_TIME_ZONE})::date
+                             = (now() at time zone ${SHOP_TIME_ZONE})::date)::int as today,
+      coalesce(sum(total) filter (where status <> 'cancelled'
+                and date_trunc('month', created_at at time zone ${SHOP_TIME_ZONE})
+                  = date_trunc('month', now() at time zone ${SHOP_TIME_ZONE})), 0)::int as "monthSales"
+    from orders`;
+  return s;
 }

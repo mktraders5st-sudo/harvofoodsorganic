@@ -6,19 +6,22 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
-    "orders": "node scripts/list-orders.mjs",
-    "backup": "node scripts/backup-db.mjs"
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:import": "node scripts/db-import-sqlite.mjs",
+    "orders": "node scripts/list-orders.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "~12.11.1",
     "next": "^15.5.0",
+    "postgres": "^3.4.9",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.24.0"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "~12.11.1"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.11",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

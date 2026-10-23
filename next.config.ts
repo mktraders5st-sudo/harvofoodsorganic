@@ -10,8 +10,6 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // Native database driver: load it from node_modules at runtime instead of bundling it.
-  serverExternalPackages: ["better-sqlite3"],
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

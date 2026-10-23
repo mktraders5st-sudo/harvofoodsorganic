@@ -1,48 +1,38 @@
-// Server-only: opens the SQLite database and applies pending migrations.
-// Never import this file from a "use client" component.
+// Server-only: the PostgreSQL (Supabase) connection.
+// Never import this file from a "use client" component. The connection string comes from the
+// DATABASE_URL environment variable and is never sent to the browser or logged.
 
-import Database from "better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
-import { seedCatalog } from "./seed";
+import postgres from "postgres";
 
-const DB_PATH = process.env.HARVO_DB_PATH ?? path.join(process.cwd(), "data", "harvo.db");
-const MIGRATIONS_DIR = path.join(process.cwd(), "db", "migrations");
+export type Sql = postgres.Sql;
 
-/** Applies db/migrations/NNN_*.sql files newer than the database's user_version. */
-function migrate(db: Database.Database) {
-  const current = db.pragma("user_version", { simple: true }) as number;
-  const files = fs
-    .readdirSync(MIGRATIONS_DIR)
-    .filter((f) => /^\d{3}_.+\.sql$/.test(f))
-    .sort();
+function connect(): Sql {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set. Add it to .env.local (see .env.example).");
 
-  for (const file of files) {
-    const version = Number(file.slice(0, 3));
-    if (version <= current) continue;
-    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), "utf8");
-    db.transaction(() => {
-      db.exec(sql);
-      db.pragma(`user_version = ${version}`);
-    })();
-  }
+  return postgres(url, {
+    ssl: "require",
+    // Supabase's transaction pooler (port 6543) doesn't support prepared statements.
+    prepare: false,
+    // Keep the pool small: on Vercel each server instance opens its own connections.
+    max: process.env.NODE_ENV === "production" ? 3 : 5,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    onnotice: () => {},
+  });
 }
 
-function open() {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.pragma("busy_timeout = 5000");
-  migrate(db);
-  seedCatalog(db);
-  return db;
+// One pool per server process (reused across hot reloads in development).
+const globalForDb = globalThis as unknown as { harvoSql?: Sql };
+
+/** The shared connection pool, created on first use so builds don't need a database. */
+export function db(): Sql {
+  globalForDb.harvoSql ??= connect();
+  return globalForDb.harvoSql;
 }
 
-// Reuse one connection across hot reloads in development.
-const globalForDb = globalThis as unknown as { harvoDb?: Database.Database };
-
-export function getDb() {
-  globalForDb.harvoDb ??= open();
-  return globalForDb.harvoDb;
+/** True for a unique-constraint violation on the named constraint (Postgres error 23505). */
+export function isUniqueViolation(err: unknown, constraint?: string) {
+  const e = err as { code?: string; constraint_name?: string };
+  return e?.code === "23505" && (!constraint || e.constraint_name === constraint);
 }

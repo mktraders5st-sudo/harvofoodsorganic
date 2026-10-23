@@ -72,7 +72,7 @@ const loginSchema = z.object({
 });
 
 export async function loginAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  if (!rateLimit(`login:${await clientIp()}`, 10, 15 * 60 * 1000)) {
+  if (!(await rateLimit(`login:${await clientIp()}`, 10, 15 * 60 * 1000))) {
     return { ok: false, message: "Too many sign-in attempts. Please wait 15 minutes." };
   }
 
@@ -105,7 +105,7 @@ export async function updateOrderStatusAction(_prev: ActionState, fd: FormData):
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
   try {
-    setOrderStatus(parsed.data.orderNumber, parsed.data.status, admin.name);
+    await setOrderStatus(parsed.data.orderNumber, parsed.data.status, admin.name);
   } catch (err) {
     if (err instanceof StatusError) return { ok: false, message: err.message };
     throw err;
@@ -170,12 +170,12 @@ export async function createProductAction(_prev: ActionState, fd: FormData): Pro
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
   const { id, grams, price, stock, ...fields } = parsed.data;
-  if (productExists(id)) {
+  if (await productExists(id)) {
     return { ok: false, message: "A product with this ID already exists.", errors: { id: "Already in use" }, values: echo(fd) };
   }
 
-  createProduct(id, fields);
-  addVariant(id, { grams, price, stock });
+  await createProduct(id, fields);
+  await addVariant(id, { grams, price, stock });
   refreshCatalogPages(id);
   redirect(`/admin/products/${id}?created=1`);
 }
@@ -189,7 +189,7 @@ export async function updateProductAction(_prev: ActionState, fd: FormData): Pro
   const parsed = productSchema.safeParse(values);
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
-  if (!updateProduct(id.data, parsed.data)) return { ok: false, message: "Product not found." };
+  if (!(await updateProduct(id.data, parsed.data))) return { ok: false, message: "Product not found." };
   refreshCatalogPages(id.data);
   return { ok: true, message: "Product saved." };
 }
@@ -209,7 +209,7 @@ export async function updateVariantAction(_prev: ActionState, fd: FormData): Pro
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
   const { productId, variantId, ...v } = parsed.data;
-  if (!updateVariant(productId, variantId, v)) return { ok: false, message: "Size not found." };
+  if (!(await updateVariant(productId, variantId, v))) return { ok: false, message: "Size not found." };
   refreshCatalogPages(productId);
   return { ok: true, message: "Saved." };
 }
@@ -222,9 +222,9 @@ export async function addVariantAction(_prev: ActionState, fd: FormData): Promis
   if (!parsed.success) return errorsFrom(parsed.error, fd);
 
   const { productId, ...v } = parsed.data;
-  if (!productExists(productId)) return { ok: false, message: "Product not found." };
+  if (!(await productExists(productId))) return { ok: false, message: "Product not found." };
   try {
-    addVariant(productId, v);
+    await addVariant(productId, v);
   } catch (err) {
     if (err instanceof Error && err.message.includes("UNIQUE")) {
       return { ok: false, message: "This product already has that size.", errors: { grams: "Already exists" }, values: echo(fd) };
@@ -240,7 +240,7 @@ export async function deleteVariantAction(_prev: ActionState, fd: FormData): Pro
   const parsed = variantRef.safeParse(formValues(fd));
   if (!parsed.success) return { ok: false, message: "Invalid size." };
 
-  if (!deleteVariant(parsed.data.productId, parsed.data.variantId)) return { ok: false, message: "Size not found." };
+  if (!(await deleteVariant(parsed.data.productId, parsed.data.variantId))) return { ok: false, message: "Size not found." };
   refreshCatalogPages(parsed.data.productId);
   return { ok: true, message: "Size removed. Past orders keep their details." };
 }

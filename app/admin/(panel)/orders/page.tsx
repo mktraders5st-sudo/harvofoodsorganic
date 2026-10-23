@@ -17,7 +17,7 @@ export default async function AdminOrdersPage({
   const status = ORDER_STATUSES.includes(params.status as OrderStatus) ? (params.status as OrderStatus) : undefined;
   const q = (params.q ?? "").slice(0, 60);
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
-  const { orders, total, pages } = listOrders({ status, q, page });
+  const { orders, total, pages } = await listOrders({ status, q, page });
 
   const link = (overrides: Record<string, string | number | undefined>) => {
     const sp = new URLSearchParams();

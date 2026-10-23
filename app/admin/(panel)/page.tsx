@@ -11,9 +11,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function AdminDashboard() {
   await requireAdmin();
-  const stats = dashboardStats();
-  const { orders } = listOrders({ page: 1 });
-  const lowStock = lowStockVariants(LOW_STOCK);
+  const [stats, { orders }, lowStock] = await Promise.all([dashboardStats(), listOrders({ page: 1 }), lowStockVariants(LOW_STOCK)]);
 
   const tiles = [
     { label: "New orders to confirm", value: stats.pending, href: "/admin/orders?status=pending", accent: stats.pending > 0 },
