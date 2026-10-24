@@ -67,7 +67,8 @@ npm run db:import -- --prod --apply --confirm=wrwiuvdijwuvwwygkkyf
 ```
 
 - Everything is copied in **one transaction**: either all of it is saved or none of it.
-- Rows that already exist (same id) are **skipped, never overwritten**, so running it again is safe and adds nothing.
+- Rows that already exist (same id) are **skipped, never overwritten**: prices and stock you change in the admin are never replaced.
+- **It runs only once.** If the database already has products, `--apply` stops without writing anything. Running it again would bring back any sizes you deleted in the admin. Override with `--allow-existing` only if you really mean to.
 - At the end it compares every product and size with SQLite and prints `all match`, or lists any difference (for example a price you have already changed in the live admin).
 - **Run it once, before the shop takes real orders.** Prices and stock you change later in the live admin are the ones that count; SQLite is only the starting point.
 

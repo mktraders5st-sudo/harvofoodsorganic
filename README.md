@@ -44,7 +44,7 @@ Open a terminal **in this folder** (`harvo-web`). On Windows: open the folder in
    ```bash
    npm run db:import -- --apply
    ```
-   Both are safe to run again: finished migrations are skipped, and rows that already exist are never changed.
+   Migrations are safe to run again: finished ones are skipped. The import never changes existing rows, and `--apply` refuses to run once the database already has products (override: `--allow-existing`).
 
 ### Every day
 

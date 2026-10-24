@@ -1,6 +1,8 @@
 // Copies products, sizes and orders from the old SQLite database into Supabase.
 // The SQLite file is opened READ-ONLY and never changed. Nothing in Supabase is deleted or
 // overwritten: rows that already exist (same id) are skipped. Everything runs in one transaction.
+// --apply refuses to run if the target already has products (it was imported before), because a
+// second import would bring back sizes deleted in the admin. Override with --allow-existing.
 //
 //   npm run db:import                          dry run against the development database
 //   npm run db:import -- --apply               copy into the development database
@@ -14,6 +16,7 @@ import { openTarget } from "./db-env.mjs";
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
+const allowExisting = args.includes("--allow-existing");
 const sqlitePath = path.resolve(args.find((a) => a.startsWith("--sqlite="))?.slice(9) ?? "data/harvo.db");
 
 if (!fs.existsSync(sqlitePath)) { console.error(`SQLite file not found: ${sqlitePath}`); process.exit(1); }
@@ -68,7 +71,14 @@ try {
     console.log(`${name.padEnd(16)} ${String(rows.length).padStart(9)}   ${String(skip).padStart(17)}   ${String(rows.length - skip).padStart(9)}`);
   }
 
-  if (!apply) {
+  // The import is meant to run once, into an empty database. Run again later, it would bring back
+  // sizes deleted in the admin since, so --apply stops if products already exist.
+  if (apply && have.products.size > 0 && !allowExisting) {
+    console.error(`\nSTOP: the target already has ${have.products.size} product(s), so it has been imported before. Nothing was written.`);
+    console.error("Running it again would bring back any sizes deleted in the admin since then (prices are never overwritten).");
+    console.error("Only if you are sure, run the same command again with:  --allow-existing");
+    process.exitCode = 1;
+  } else if (!apply) {
     console.log("\nDry run only: nothing was written. Add --apply to copy.");
   } else {
     await sql.begin(async (tx) => {
