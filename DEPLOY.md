@@ -1,147 +1,129 @@
-# Deploying Harvo Foods Organic
+# Deploying Harvo Foods Organic (Vercel + Supabase)
 
-This site keeps orders and products in a SQLite database file, so it needs a server with a **persistent disk**: a small Linux VPS is ideal (e.g. DigitalOcean, Hetzner, Vultr, Contabo; 1 GB RAM is enough).
+| Part | Where | Notes |
+| --- | --- | --- |
+| Website | **Vercel**, region `bom1` (Mumbai, set in `vercel.json`) | Builds from the GitHub repository |
+| Database | **Supabase** PostgreSQL, project `wrwiuvdijwuvwwygkkyf`, region `ap-south-1` (Mumbai) | Same region as the website, so pages stay fast |
 
-> **Not suitable as-is:** Vercel, Netlify and other serverless hosts delete files between requests, so orders would be lost. To use them, the database layer (`lib/server/db.ts`) must first be moved to a hosted database such as Postgres or Turso.
+The website talks to the database only from its server, through `DATABASE_URL`. No database key is ever sent to the browser, and the Supabase `service_role` key is **not used at all**: don't add it anywhere.
 
-The steps below are for **Ubuntu 24.04**. Replace `harvofoods.com` with your domain.
+> **Rules for the live database:** every command below that says **LIVE** needs `--prod` *and* `--confirm=wrwiuvdijwuvwwygkkyf`. Without both, the command stops before connecting. Always run the dry run (no `--apply`) first and read what it says.
 
 ---
 
-## 1. Prepare the server
+## 1. Save the live database address on your computer
+
+Already done if `.env.production.local` exists in `harvo-web`. Otherwise:
+
+1. Supabase → your project → **Connect** → **Connection string** → **Transaction pooler**.
+2. Copy it. It looks like `postgresql://postgres.wrwiuvdijwuvwwygkkyf:[YOUR-PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`. Replace `[YOUR-PASSWORD]` with your database password.
+3. Save it in `harvo-web/.env.production.local` as one line:
+   ```
+   DATABASE_URL="postgresql://postgres.wrwiuvdijwuvwwygkkyf:...@aws-0-ap-south-1.pooler.supabase.com:6543/postgres"
+   ```
+
+This file is Git-ignored: never commit it, paste it into chat, or share it. Only the `db:*` commands with `--prod` read it.
+
+## 2. Create the tables in the live database (LIVE)
+
+Look first. This is read-only: it runs inside a read-only transaction, so the database refuses any change:
 
 ```bash
-# Log in as root once, create a normal user, and use that from now on
-adduser harvo && usermod -aG sudo harvo
-su - harvo
-
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git nginx
-
-# Node.js 24 LTS
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-sudo apt install -y nodejs
-node --version   # should print v24.x
-
-# Firewall: allow only SSH and the website
-sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw enable
+npm run db:migrate -- --prod --confirm=wrwiuvdijwuvwwygkkyf
 ```
 
-Point your domain's **A record** to the server's IP address at your domain registrar.
-
-## 2. Get the code
-
-The GitHub repository is private, so the server needs read access. The simplest safe way is a **deploy key** (read-only, for this repository only):
+It should list `001_schema.sql`, `002_security.sql` and `003_categories.sql` as `pending`. Then run them:
 
 ```bash
-ssh-keygen -t ed25519 -C "harvo-server" -f ~/.ssh/harvo_deploy -N ""
-cat ~/.ssh/harvo_deploy.pub
+npm run db:migrate -- --prod --apply --confirm=wrwiuvdijwuvwwygkkyf
 ```
 
-Copy the printed key → GitHub → repository **Settings → Deploy keys → Add deploy key** (leave "Allow write access" **off**). Then:
+What the migrations do:
+
+| File | Does |
+| --- | --- |
+| `001_schema.sql` | Creates the tables (only if they don't exist yet; nothing is dropped) |
+| `002_security.sql` | Turns on Row Level Security for every table and removes all access for Supabase's public API roles |
+| `003_categories.sql` | Adds the 5 categories (existing ones are left alone) |
+
+Each file runs in its own transaction and is recorded in `schema_migrations`, so it never runs twice. If one fails, nothing from that file is saved.
+
+**Check:** Supabase → **Table Editor** shows the 9 tables, each marked RLS enabled. Running the dry run again says "Nothing to do".
+
+## 3. Copy the products into the live database (LIVE)
+
+This copies the 18 products, their 54 sizes, prices and stock (and any orders) from `data/harvo.db`. The SQLite file is opened read-only.
+
+Look first (read-only, prints a table of what would be added):
 
 ```bash
-cat >> ~/.ssh/config <<'EOF'
-Host github.com
-  IdentityFile ~/.ssh/harvo_deploy
-EOF
-
-git clone git@github.com:mktraders5st-sudo/harvofoodsorganic.git ~/harvo
-cd ~/harvo
+npm run db:import -- --prod --confirm=wrwiuvdijwuvwwygkkyf
 ```
 
-## 3. Install, build and set the admin password
+Then copy:
 
 ```bash
-npm ci
-npm run build
-cp .env.example .env.local
-nano .env.local          # set ADMIN_PASSWORD=<a strong password, 12+ characters>, then Ctrl+O, Enter, Ctrl+X
-chmod 600 .env.local     # only your user can read it
+npm run db:import -- --prod --apply --confirm=wrwiuvdijwuvwwygkkyf
 ```
 
-Without `ADMIN_PASSWORD` the admin panel stays locked. The database is created at `~/harvo/data/harvo.db` the first time the site starts, filled with the starting product list. To keep it elsewhere, also set `HARVO_DB_PATH` in `.env.local`.
+- Everything is copied in **one transaction**: either all of it is saved or none of it.
+- Rows that already exist (same id) are **skipped, never overwritten**, so running it again is safe and adds nothing.
+- At the end it compares every product and size with SQLite and prints `all match`, or lists any difference (for example a price you have already changed in the live admin).
+- **Run it once, before the shop takes real orders.** Prices and stock you change later in the live admin are the ones that count; SQLite is only the starting point.
 
-## 4. Keep it running with PM2
+## 4. Put the code on the production branch
 
-```bash
-sudo npm install -g pm2
-pm2 start npm --name harvo -- start      # runs on port 3000
-pm2 save
-pm2 startup                              # run the command it prints, so the site restarts after a reboot
-```
+Vercel deploys the `main` branch as the live site. The Supabase version of the code is on the `supabase` branch, so it must be merged into `main` and pushed first (the current `main` still uses SQLite, which can't work on Vercel).
 
-Useful: `pm2 status`, `pm2 logs harvo`, `pm2 restart harvo`.
+## 5. Create the Vercel project
 
-## 5. Nginx and HTTPS
+1. Go to https://vercel.com, sign up with GitHub (Hobby plan is free).
+2. **Add New → Project → Import** `mktraders5st-sudo/harvofoodsorganic`. The repository is private: when GitHub asks, give Vercel access to **only this repository**.
+3. Framework: **Next.js** (detected). Root directory, build and install commands: leave the defaults.
+4. Open **Environment Variables** before the first deploy and add:
 
-```bash
-sudo tee /etc/nginx/sites-available/harvo >/dev/null <<'EOF'
-server {
-    listen 80;
-    server_name harvofoods.com www.harvofoods.com;
+   | Name | Value | Environments | Sensitive |
+   | --- | --- | --- | --- |
+   | `DATABASE_URL` | The Transaction pooler address from step 1 (port **6543**) | **Production only** | Yes |
+   | `ADMIN_PASSWORD` | A new strong password, 12+ characters, not used anywhere else | **Production only** | Yes |
 
-    client_max_body_size 1m;
+   Tick **Production** only, not Preview or Development. Vercel also builds a "preview" site for every other branch you push; keeping these Production-only means previews can never read or change live orders.
 
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        # Overwrite (don't append) so visitors can't fake their IP and dodge the rate limits
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-EOF
-sudo ln -s /etc/nginx/sites-available/harvo /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t && sudo systemctl reload nginx
+   Don't add `NODE_ENV` (Vercel sets it) or any `NEXT_PUBLIC_` variable for these: that prefix would send them to the browser.
+5. **Settings → General → Node.js Version:** 22.x or 24.x.
+6. Click **Deploy**.
 
-# Free HTTPS certificate (renews automatically)
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d harvofoods.com -d www.harvofoods.com
-```
+## 6. Check the live site
 
-HTTPS is required: the admin login cookie is only sent over secure connections in production.
+- Open the `….vercel.app` address: home page and shop show the 18 products with their prices.
+- `/admin` asks for the password, and `ADMIN_PASSWORD` gets you in.
+- Place one test order (cash on delivery), see it in `/admin/orders`, then cancel it, which puts the stock back.
 
-Open `https://harvofoods.com` (shop) and `https://harvofoods.com/admin` (admin).
+## 7. Your own domain
 
-## 6. Daily backups
+Vercel → project → **Settings → Domains → Add** `harvofoods.com`, then add the DNS records Vercel shows at your domain registrar. HTTPS is set up automatically. HTTPS is required: the admin sign-in cookie is only sent over secure connections.
 
-The database holds every order. Back it up daily and copy backups off the server now and then.
+## Updating the site later
 
-```bash
-mkdir -p ~/harvo-backups
-crontab -e
-```
+- **Code changes:** push to `main`; Vercel builds and deploys automatically. If something breaks: Vercel → **Deployments** → pick the previous one → **Promote to Production** (instant rollback).
+- **Database changes** (a new file in `db/migrations/`): run the LIVE migrate dry run, then `--apply` (step 2), **before** pushing the code that needs it.
+- **Changing the database password** (Supabase → Database → Settings): update it in **both** `.env.production.local` and Vercel's `DATABASE_URL`, then redeploy.
+- **Changing the admin password:** change `ADMIN_PASSWORD` in Vercel, then redeploy. Everyone signed in is signed out.
 
-Add this line (runs at 3:00 am every day, keeps the newest 30):
+## Backups and limits (Supabase free plan)
 
-```
-0 3 * * * cd /home/harvo/harvo && /usr/bin/npm run backup -- /home/harvo/harvo-backups >> /home/harvo/harvo-backups/backup.log 2>&1
-```
-
-**Restore** a backup: `pm2 stop harvo`, copy the backup file over `data/harvo.db` (and delete `data/harvo.db-wal` and `data/harvo.db-shm` if present), then `pm2 start harvo`.
-
-## 7. Updating the site
-
-After pushing changes to GitHub:
-
-```bash
-cd ~/harvo
-git pull
-npm ci
-npm run build
-pm2 restart harvo
-```
-
-Database changes in `db/migrations/` apply automatically on restart; orders and products are kept.
+- See Supabase → **Database → Backups** for what your plan includes. If there are no backups you can restore, export the `orders`, `order_items` and `products` tables now and then from **Table Editor → Export to CSV**.
+- Free projects are **paused after a week with no activity**. A shop with visitors stays active, but if it pauses, restore it from the Supabase dashboard.
+- The website uses at most 3 database connections per Vercel server, through the pooler, well inside the free limits.
 
 ## Checklist before going live
 
-- [ ] Real prices and stock set in `/admin/products` (starting stock is 50 per size)
+- [ ] `.env.production.local` saved and Git-ignored (`git status` doesn't list it)
+- [ ] LIVE migrate dry run reviewed, then applied; Table Editor shows 9 tables with RLS enabled
+- [ ] LIVE import dry run reviewed, then applied; it printed `all match`
+- [ ] `supabase` branch merged into `main` and pushed
+- [ ] Vercel: `DATABASE_URL` and `ADMIN_PASSWORD` set for **Production only**, marked Sensitive
+- [ ] Real prices and stock set in `/admin/products`
 - [ ] Example products reviewed (Mango, Banana and Orange Peel Powder, Mixed Herb Seasoning are examples)
 - [ ] Social profile links added in `lib/data.ts` (`socialLinks`), if you have them
-- [ ] Test order placed and seen in `/admin/orders`, then cancelled
-- [ ] Backups running (`ls ~/harvo-backups` the next day)
+- [ ] Test order placed, seen in `/admin/orders`, then cancelled

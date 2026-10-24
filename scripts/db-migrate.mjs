@@ -15,13 +15,18 @@ const dir = path.join(process.cwd(), "db", "migrations");
 
 try {
   console.log(`\n${label}`);
-  // A dry run only reads: the tracking table is created only when --apply is used.
-  const [{ exists }] = await sql`select to_regclass('public.schema_migrations') is not null as exists`;
+  // A dry run only reads, inside a READ ONLY transaction, so the database itself refuses any write.
+  // The tracking table is created only when --apply is used.
+  const status = async (q) => {
+    const [{ exists }] = await q`select to_regclass('public.schema_migrations') is not null as exists`;
+    const versions = exists ? (await q`select version from schema_migrations`).map((r) => r.version) : [];
+    return { exists, done: new Set(versions) };
+  };
+  const { exists, done } = apply ? await status(sql) : await sql.begin("read only", status);
   if (!exists && apply) {
     await sql`create table schema_migrations (
       version text primary key, applied_at timestamptz not null default now())`;
   }
-  const done = new Set(exists || apply ? (await sql`select version from schema_migrations`).map((r) => r.version) : []);
 
   const files = fs.readdirSync(dir).filter((f) => /^\d{3}_[\w-]+\.sql$/.test(f)).sort();
   const pending = files.filter((f) => !done.has(f));
