@@ -60,3 +60,6 @@ desktop.ini
 
 # Database backups (contain customer details)
 backups/
+
+# Local development database (PGlite) data: test data only, never committed
+tools/local-db/data/

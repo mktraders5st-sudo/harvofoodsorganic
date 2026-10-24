@@ -1,0 +1,11 @@
+{
+  "name": "harvo-local-db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Development-only local PostgreSQL (PGlite) for testing on this computer. Not part of the website build.",
+  "type": "module",
+  "dependencies": {
+    "@electric-sql/pglite": "0.4.6",
+    "@electric-sql/pglite-socket": "0.1.6"
+  }
+}

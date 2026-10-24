@@ -8,6 +8,7 @@
     "start": "next start",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:import": "node scripts/db-import-sqlite.mjs",
+    "db:local": "node tools/local-db/server.mjs",
     "orders": "node scripts/list-orders.mjs"
   },
   "dependencies": {

@@ -62,10 +62,10 @@ try {
     ["order items", source.items, (r) => have.items.has(r.id)],
     ["order history", source.history, (r) => have.history.has(r.id)],
   ];
-  console.log("table            in SQLite   already in Supabase   would add");
+  console.log("table            in SQLite   already in target   would add");
   for (const [name, rows, exists] of plan) {
     const skip = rows.filter(exists).length;
-    console.log(`${name.padEnd(16)} ${String(rows.length).padStart(9)}   ${String(skip).padStart(19)}   ${String(rows.length - skip).padStart(9)}`);
+    console.log(`${name.padEnd(16)} ${String(rows.length).padStart(9)}   ${String(skip).padStart(17)}   ${String(rows.length - skip).padStart(9)}`);
   }
 
   if (!apply) {
